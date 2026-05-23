@@ -216,15 +216,23 @@ bool CIRGenFunction::constantFoldsToSimpleInteger(const Expr *cond,
   resultInt = intValue;
   return true;
 }
-static bool hasDeletedCopyConstructor(
+/// Check recursively whether \p RD has a copy constructor that is
+/// non-trivial (user-defined, deleted, or implicitly deleted).
+/// This is necessary because CXXRecordDecl::hasTrivialCopyConstructor()
+/// may return inaccurate results for classes where the copy constructor
+/// has not been explicitly generated (e.g., with C++17 guaranteed copy
+/// elision the implicit copy ctor may never be declared).
+static bool hasNonTrivialCopyConstructor(
     const clang::CXXRecordDecl *rd,
     llvm::SmallPtrSet<const clang::CXXRecordDecl *, 8> &visited) {
   if (!visited.insert(rd).second)
     return false;
-  // Check user-declared copy ctors.
+  // Check user-declared copy constructors.  isTrivial() may return true
+  // for =delete copy ctors in Clang, so check isDeleted() explicitly.
   if (rd->hasUserDeclaredCopyConstructor()) {
     for (const auto *ctor : rd->ctors())
-      if (ctor->isCopyConstructor() && ctor->isDeleted())
+      if (ctor->isCopyConstructor() &&
+          (ctor->isDeleted() || !ctor->isTrivial()))
         return true;
   } else if (!rd->needsOverloadResolutionForCopyConstructor() &&
              rd->defaultedCopyConstructorIsDeleted()) {
@@ -233,11 +241,11 @@ static bool hasDeletedCopyConstructor(
   // Check fields and bases recursively.
   for (const auto *field : rd->fields())
     if (const auto *fieldRD = field->getType()->getAsCXXRecordDecl())
-      if (hasDeletedCopyConstructor(fieldRD, visited))
+      if (hasNonTrivialCopyConstructor(fieldRD, visited))
         return true;
   for (const auto &base : rd->bases())
     if (const auto *baseRD = base.getType()->getAsCXXRecordDecl())
-      if (hasDeletedCopyConstructor(baseRD, visited))
+      if (hasNonTrivialCopyConstructor(baseRD, visited))
         return true;
   return false;
 }
@@ -245,12 +253,11 @@ static bool hasDeletedCopyConstructor(
 void CIRGenFunction::emitAndUpdateRetAlloca(QualType type, mlir::Location loc,
                                             CharUnits alignment) {
   if (!type->isVoidType()) {
-    // Types with non-trivial or deleted copy constructors cannot be
-    // bitwise-copied into __retval.  The return value must flow as an
-    // SSA value directly.
+    // Types with a non-trivial copy constructor cannot be bitwise-copied
+    // into __retval.  The return value must flow as an SSA value directly.
     if (const auto *rd = type->getAsCXXRecordDecl()) {
       llvm::SmallPtrSet<const clang::CXXRecordDecl *, 8> visited;
-      if (hasDeletedCopyConstructor(rd, visited))
+      if (hasNonTrivialCopyConstructor(rd, visited))
         return;
     }
     Address allocaAddr = Address::invalid();

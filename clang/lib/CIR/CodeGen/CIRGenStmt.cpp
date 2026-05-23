@@ -608,11 +608,25 @@ mlir::LogicalResult CIRGenFunction::emitReturnStmt(const ReturnStmt &s) {
       // Apply the named return value optimization for this return statement,
       // which means doing nothing: the appropriate result has already been
       // constructed into the NRVO variable.
-
+      //
       // If there is an NRVO flag for this variable, set it to 1 into indicate
       // that the cleanup code should not destroy the variable.
-      if (auto nrvoFlag = nrvoFlags[s.getNRVOCandidate()])
+      const auto *nrvoVar = s.getNRVOCandidate();
+      if (auto nrvoFlag = nrvoFlags[nrvoVar])
         builder.createFlagStore(loc, true, nrvoFlag);
+      // Classic CodeGen (OGCG) uses sret parameters for aggregate returns, so
+      // the NRVO variable IS the return slot and no explicit return value is
+      // needed.  CIR defers ABI lowering, returning aggregates by value via
+      // cir.return; when __retval is absent (non-trivial copy ctor), the NRVO
+      // variable was allocated as a normal local instead.  Load it here so the
+      // epilogue below can forward the SSA value to cir.return.
+      if (!fnRetAlloca) {
+        if (mlir::Value nrvoAddrVal = symbolTable.lookup(nrvoVar)) {
+          directReturnValue = builder.createLoad(
+              loc, Address(nrvoAddrVal, getContext().getTypeAlignInChars(
+                                            nrvoVar->getType())));
+        }
+      }
     } else if (!rv) {
       // No return expression. Do nothing.
     } else if (rv->getType()->isVoidType()) {

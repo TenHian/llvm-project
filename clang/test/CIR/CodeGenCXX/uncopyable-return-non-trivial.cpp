@@ -5,7 +5,7 @@
 // RUN: %clang_cc1 -std=c++17 -triple x86_64-unknown-unknown -emit-llvm %s -o %t.ll
 // RUN: FileCheck --check-prefix=OGCG --input-file=%t.ll %s
 //
-// XFAIL: *
+
 //
 //===----------------------------------------------------------------------===//
 // Tests that CIRGen does not emit illegal copies for return values of
@@ -44,14 +44,14 @@ struct S {
 S foo();
 S bar() { return foo(); }
 
-// CIR-LABEL: cir.func {{.*}} @_ZN22non_trivial_user_copy3barEv
+// CIR-LABEL: cir.func {{.*}} @_ZN21non_trivial_user_copy3barEv
 // CIR-NOT:     __retval
-// CIR:         %{{[0-9]+}} = cir.call @_ZN22non_trivial_user_copy3fooEv() : () -> !rec{{.*}}
+// CIR:         %{{[0-9]+}} = cir.call @_ZN21non_trivial_user_copy3fooEv() : () -> !rec{{.*}}
 // CIR-NEXT:    cir.return %{{[0-9]+}} : !rec{{.*}}
 
-// LLVM-LABEL: define {{.*}} @_ZN22non_trivial_user_copy3barEv(
+// LLVM-LABEL: define {{.*}} @_ZN21non_trivial_user_copy3barEv(
 
-// OGCG-LABEL: define {{.*}} void @_ZN22non_trivial_user_copy3barEv(
+// OGCG-LABEL: define {{.*}} void @_ZN21non_trivial_user_copy3barEv(
 }
 
 // --- Test 14: Non-trivial copy ctor with non-trivial destructor ---
@@ -97,14 +97,14 @@ struct A {
 A foo();
 A bar() { return foo(); }
 
-// CIR-LABEL: cir.func {{.*}} @_ZN22non_trivial_by_member3barEv
+// CIR-LABEL: cir.func {{.*}} @_ZN21non_trivial_by_member3barEv
 // CIR-NOT:     __retval
-// CIR:         %{{[0-9]+}} = cir.call @_ZN22non_trivial_by_member3fooEv() : () -> !rec{{.*}}
+// CIR:         %{{[0-9]+}} = cir.call @_ZN21non_trivial_by_member3fooEv() : () -> !rec{{.*}}
 // CIR-NEXT:    cir.return %{{[0-9]+}} : !rec{{.*}}
 
-// LLVM-LABEL: define {{.*}} @_ZN22non_trivial_by_member3barEv(
+// LLVM-LABEL: define {{.*}} @_ZN21non_trivial_by_member3barEv(
 
-// OGCG-LABEL: define {{.*}} void @_ZN22non_trivial_by_member3barEv(
+// OGCG-LABEL: define {{.*}} void @_ZN21non_trivial_by_member3barEv(
 }
 
 // --- Test 16: Non-trivial copy ctor via base class (inheritance chain) ---
@@ -149,16 +149,16 @@ struct S {
 
 S make() { return S(42); }
 
-// CIR-LABEL: cir.func {{.*}} @_ZN22non_trivial_construct4makeEv
+// CIR-LABEL: cir.func {{.*}} @_ZN21non_trivial_construct4makeEv
 // CIR-NOT:     __retval
 // CIR:         %{{[0-9]+}} = cir.alloca {{.*}} ["agg.tmp"
-// CIR:         cir.call @_ZN22non_trivial_construct1SC1Ei(
-// CIR:         %{{[0-9]+}} = cir.load %{{[0-9]+}} : !cir.ptr<!rec{{.*}}>, !rec{{.*}}
+// CIR:         cir.call @_ZN21non_trivial_construct1SC1Ei(
+// CIR:         %{{[0-9]+}} = cir.load{{.*}} %{{[0-9]+}} : !cir.ptr<!rec{{.*}}>, !rec{{.*}}
 // CIR-NEXT:    cir.return %{{[0-9]+}} : !rec{{.*}}
 
-// LLVM-LABEL: define {{.*}} @_ZN22non_trivial_construct4makeEv(
+// LLVM-LABEL: define {{.*}} @_ZN21non_trivial_construct4makeEv(
 
-// OGCG-LABEL: define {{.*}} void @_ZN22non_trivial_construct4makeEv(
+// OGCG-LABEL: define {{.*}} void @_ZN21non_trivial_construct4makeEv(
 }
 
 // --- Test 18: Conditional return with non-trivial type ---
@@ -175,13 +175,13 @@ S a();
 S b();
 S pick(bool c) { return c ? a() : b(); }
 
-// CIR-LABEL: cir.func {{.*}} @_ZN24non_trivial_conditional4pickEb
+// CIR-LABEL: cir.func {{.*}} @_ZN23non_trivial_conditional4pickEb
 // CIR-NOT:     __retval
 // CIR:         cir.return
 
-// LLVM-LABEL: define {{.*}} @_ZN24non_trivial_conditional4pickEb(
+// LLVM-LABEL: define {{.*}} @_ZN23non_trivial_conditional4pickEb(
 
-// OGCG-LABEL: define {{.*}} void @_ZN24non_trivial_conditional4pickEb(
+// OGCG-LABEL: define {{.*}} void @_ZN23non_trivial_conditional4pickEb(
 }
 
 // --- Test 19: Virtual function returning non-trivial type ---

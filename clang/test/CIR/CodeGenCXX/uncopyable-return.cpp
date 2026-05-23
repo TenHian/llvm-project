@@ -344,7 +344,7 @@ S make() { return S(); }
 // CIR-NOT:     __retval
 // CIR:         cir.alloca {{.*}} ["agg.tmp"
 // CIR:         cir.call @_ZN17deleted_construct1SC1Ev
-// CIR:         %{{[0-9]+}} = cir.load %{{[0-9]+}} : !cir.ptr<!rec{{.*}}>, !rec{{.*}}
+// CIR:         %{{[0-9]+}} = cir.load{{.*}} %{{[0-9]+}} : !cir.ptr<!rec{{.*}}>, !rec{{.*}}
 // CIR-NEXT:    cir.return
 
 // LLVM-LABEL: define {{.*}} @_ZN17deleted_construct4makeEv(
