@@ -246,26 +246,8 @@ void C::f(int x, ...) {}
 // CIR:   cir.call @_ZN5Test41C1gEi(%[[T4_RESULT]], %[[T4_ARG]])
 // CIR:   cir.return
 
-// --- Test5: aggregate non-trivial return type thunk ---
-
-// CIR: cir.func {{.*}} @_ZN5Test51C1hEv
-
-// CIR: cir.func {{.*}} @_ZThn8_N5Test51C1hEv(%arg0: !cir.ptr<
-// CIR:   %[[T5_THIS_ADDR:.*]] = cir.alloca {{.*}} ["this", init]
-// CIR:   %[[T5_RETVAL:.*]] = cir.alloca !rec_Test5{{.*}}NonTrivial, {{.*}} ["__retval"]
-// CIR:   cir.store %arg0, %[[T5_THIS_ADDR]]
-// CIR:   %[[T5_THIS:.*]] = cir.load %[[T5_THIS_ADDR]]
-// CIR:   %[[T5_CAST:.*]] = cir.cast bitcast %[[T5_THIS]] : !cir.ptr<{{.*}}> -> !cir.ptr<!u8i>
-// CIR:   %[[T5_OFFSET:.*]] = cir.const #cir.int<-8> : !s64i
-// CIR:   %[[T5_ADJUSTED:.*]] = cir.ptr_stride %[[T5_CAST]], %[[T5_OFFSET]]
-// CIR:   %[[T5_RESULT:.*]] = cir.cast bitcast %[[T5_ADJUSTED]] : !cir.ptr<!u8i> -> !cir.ptr<
-// CIR:   %[[T5_CALL:.*]] = cir.call @_ZN5Test51C1hEv(%[[T5_RESULT]]){{.*}} -> !rec_Test5{{.*}}NonTrivial
-// CIR:   cir.store {{.*}} %[[T5_CALL]], %[[T5_RETVAL]]
-// CIR:   %[[T5_RET_VAL:.*]] = cir.load %[[T5_RETVAL]]
-// CIR:   cir.return %[[T5_RET_VAL]]
-// CIR-NOT: cir.trap
-// CIR-NOT: cir.unreachable
-
+// --- Test5: aggregate non-trivial return type thunk was moved to
+// thunks-agg-return.cpp with corrected CHECKs (no __retval).
 // --- CovariantReturn: return adjustment with null check on pointer return ---
 
 // CIR-LABEL: cir.func {{.*}} @_ZTch0_v0_n32_N15CovariantReturn1C1fEv
@@ -336,14 +318,7 @@ void C::f(int x, ...) {}
 // LLVM:   %[[L4_ARG:.*]] = load i32, ptr
 // LLVM:   call void @_ZN5Test41C1gEi(ptr{{.*}} %[[L4_ADJ]], i32{{.*}} %[[L4_ARG]])
 
-// LLVM: define {{.*}} %"struct.Test5::NonTrivial" @_ZThn8_N5Test51C1hEv(ptr{{.*}})
-// LLVM:   %[[L5_THIS:.*]] = load ptr, ptr
-// LLVM:   %[[L5_ADJ:.*]] = getelementptr i8, ptr %[[L5_THIS]], i64 -8
-// LLVM:   %[[L5_RET:.*]] = call{{.*}} %"struct.Test5::NonTrivial" @_ZN5Test51C1hEv(ptr{{.*}} %[[L5_ADJ]])
-// LLVM:   store %"struct.Test5::NonTrivial" %[[L5_RET]], ptr
-// LLVM:   load %"struct.Test5::NonTrivial", ptr
-// LLVM:   ret %"struct.Test5::NonTrivial"
-
+// LLVM Test5 function-level check moved to thunks-agg-return.cpp.
 // LLVM-LABEL: define {{.*}} @_ZTch0_v0_n32_N15CovariantReturn1C1fEv
 // LLVM:       call {{.*}} @_ZN15CovariantReturn1C1fEv
 // LLVM:       phi ptr
@@ -405,11 +380,7 @@ void C::f(int x, ...) {}
 // OGCG:   %[[O4_ARG:.*]] = load i32, ptr
 // OGCG:   {{.*}}call void @_ZN5Test41C1gEi(ptr{{.*}} %[[O4_ADJ]], i32{{.*}} %[[O4_ARG]])
 
-// OGCG: define {{.*}} void @_ZThn8_N5Test51C1hEv(ptr {{[^,]*}}sret(%"struct.Test5::NonTrivial"){{[^,]*}}, ptr{{.*}})
-// OGCG:   %[[O5_THIS:.*]] = load ptr, ptr
-// OGCG:   %[[O5_ADJ:.*]] = getelementptr inbounds i8, ptr %[[O5_THIS]], i64 -8
-// OGCG:   {{.*}}call void @_ZN5Test51C1hEv(ptr {{.*}}sret(%"struct.Test5::NonTrivial"){{.*}}, ptr{{.*}} %[[O5_ADJ]])
-
+// OGCG Test5 function-level check moved to thunks-agg-return.cpp.
 // OGCG-LABEL: define {{.*}} @_ZTch0_v0_n32_N15CovariantReturn1C1fEv
 // OGCG:       {{.*}}call {{.*}} @_ZN15CovariantReturn1C1fEv
 // OGCG:       phi ptr

@@ -325,3 +325,53 @@ S bar() { return make<S>(); }
 
 // OGCG-LABEL: define {{.*}} void @_ZN16templated_return3barEv(
 }
+
+// --- Test 21: Return of struct via CXXConstructExpr with deleted copy ctor ---
+// return S() is a CXXTemporaryObjectExpr (not a CallExpr). The constructor
+// writes to the destination address and returns void. No SSA value to forward,
+// so an agg.tmp alloca + load is used. There must be no __retval.
+namespace deleted_construct {
+struct S {
+  S();
+  S(const S &) = delete;
+  S(S &&) = delete;
+  ~S();
+};
+
+S make() { return S(); }
+
+// CIR-LABEL: cir.func {{.*}} @_ZN17deleted_construct4makeEv
+// CIR-NOT:     __retval
+// CIR:         cir.alloca {{.*}} ["agg.tmp"
+// CIR:         cir.call @_ZN17deleted_construct1SC1Ev
+// CIR:         %{{[0-9]+}} = cir.load %{{[0-9]+}} : !cir.ptr<!rec{{.*}}>, !rec{{.*}}
+// CIR-NEXT:    cir.return
+
+// LLVM-LABEL: define {{.*}} @_ZN17deleted_construct4makeEv(
+
+// OGCG-LABEL: define {{.*}} void @_ZN17deleted_construct4makeEv(
+}
+
+
+// --- Test 26: Implicit fallthrough with deleted copy ctor type ---
+// P6: when a function with a deleted-copy-ctor return type has no return
+// statement, LexicalScope::emitReturn falls through and must not emit a
+// __retval load.  The function should terminate with trap/unreachable.
+namespace fallthrough_deleted {
+struct S {
+  S();
+  S(const S &) = delete;
+  S(S &&) = delete;
+  ~S();
+};
+
+S missing_return() {} // no return — UB
+
+// CIR-LABEL: cir.func {{.*}} @_ZN19fallthrough_deleted14missing_returnEv
+// CIR-NOT:     __retval
+// CIR:         cir.trap
+// CIR-NOT:     __retval
+
+// LLVM-LABEL: define {{.*}} @_ZN19fallthrough_deleted14missing_returnEv
+// (OGCG check omitted — missing_return may be optimized away in OGCG mode)
+}
