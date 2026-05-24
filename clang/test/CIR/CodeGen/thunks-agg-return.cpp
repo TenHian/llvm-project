@@ -5,8 +5,7 @@
 // RUN: %clang_cc1 -std=c++17 -triple x86_64-unknown-linux-gnu -fno-rtti -emit-llvm %s -o %t.ll
 // RUN: FileCheck --check-prefix=OGCG --input-file=%t.ll %s
 //
-// XFAIL: *
-//
+
 //===----------------------------------------------------------------------===//
 // Tests that CIRGen does not emit illegal copies for return values of
 // non-trivially-copyable struct types through the vtable this-adjusting
@@ -15,10 +14,9 @@
 // The expected CIR pattern is direct SSA return (cir.return %call_result)
 // without any alloca/store/load indirection.
 //
-// XFAIL reason: emitCallAndReturnForThunk creates an agg.tmp alloca +
-// store + load when returnValue is absent, even for non-trivial copy
-// ctor types.  Fix requires forNoAggregateStore() or an equivalent
-// mechanism that forwards the SSA value directly.
+// emitCallAndReturnForThunk uses forNoAggregateStore
+// when returnValue is absent, forwarding the SSA value directly via
+// cir.return without any alloca/store/load.
 //===----------------------------------------------------------------------===//
 
 namespace Test5 {

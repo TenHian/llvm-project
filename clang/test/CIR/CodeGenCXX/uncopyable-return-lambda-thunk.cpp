@@ -5,7 +5,7 @@
 // RUN: %clang_cc1 -std=c++17 -triple x86_64-unknown-unknown -emit-llvm %s -o %t.ll
 // RUN: FileCheck --check-prefix=OGCG --input-file=%t.ll %s
 //
-// XFAIL: *
+
 //
 //===----------------------------------------------------------------------===//
 // Tests that CIRGen does not emit illegal copies for return values of
@@ -18,10 +18,9 @@
 // The expected CIR pattern is direct SSA return (cir.return %call_result)
 // without any alloca/store/load indirection.
 //
-// XFAIL reason: emitForwardingCallToLambda and emitCallAndReturnForThunk
-// create an agg.tmp alloca + store + load when returnValue is absent,
-// even for deleted copy ctor types.  The fix requires forNoAggregateStore()
-// or an equivalent mechanism that forwards the SSA value directly.
+// emitForwardingCallToLambda and emitCallAndReturnForThunk use
+// forNoAggregateStore when returnValue is absent, forwarding the
+// SSA value directly via cir.return.
 //===----------------------------------------------------------------------===//
 
 // --- Test 22: Lambda static invoker with deleted copy ctor type ---
@@ -57,8 +56,6 @@ void test() {
 // LLVM-NOT:     store %"struct.deleted_lambda
 // LLVM:         ret %"struct.deleted_lambda
 
-// OGCG-LABEL: define {{.*}} void @"_ZZN14deleted_lambda4testEvEN3$_08__invokeEv"
-// OGCG:         ret void
 }
 
 // --- Test 23: Vtable thunk with deleted copy ctor type ---
@@ -103,8 +100,6 @@ S C::foo() { return S(); }
 // LLVM-NOT: store %"struct.deleted_thunk
 // LLVM: ret %"struct.deleted_thunk
 
-// OGCG: define {{.*}} void @_ZThn8_N13deleted_thunk1C3fooEv
-// OGCG: ret void
 }
 
 // --- Test 24: Lambda invoker with copy deleted via member ---
@@ -143,8 +138,6 @@ void test() {
 // LLVM-NOT:     store %"struct.deleted_by_member_lambda
 // LLVM:         ret %"struct.deleted_by_member_lambda
 
-// OGCG-LABEL: define {{.*}} void {{.*}}__invokeEv
-// OGCG:         ret void
 }
 
 // --- Test 25: Vtable thunk with copy deleted via base ---
@@ -181,6 +174,22 @@ S C::foo() { return S(); }
 // LLVM: call %"struct.deleted_by_base_thunk::S" @_ZN21deleted_by_base_thunk1C3fooEv
 // LLVM-NOT: store %"struct.deleted_by_base_thunk
 // LLVM: ret %"struct.deleted_by_base_thunk
-
-// (OGCG check omitted — verified via CIR/LLVM layers)
 }
+// OGCG checks for all tests, ordered to match OGCG function emission order
+// (thunks before lambda static invokers).
+
+// Test 23: Vtable thunk with deleted copy ctor type.
+// OGCG-LABEL: define {{.*}} void @_ZThn8_N13deleted_thunk1C3fooEv
+// OGCG:         ret void
+
+// Test 25: Vtable thunk with copy deleted via base.
+// OGCG-LABEL: define {{.*}} void @_ZThn
+// OGCG:         ret void
+
+// Test 22: Lambda static invoker with deleted copy ctor type.
+// OGCG-LABEL: define {{.*}} void @"_ZZN14deleted_lambda4testEvEN3$_08__invokeEv"
+// OGCG:         ret void
+
+// Test 24: Lambda invoker with copy deleted via member.
+// OGCG-LABEL: define {{.*}} void @"_ZZN24deleted_by_member_lambda4testEvEN3$_08__invokeEv"
+// OGCG:         ret void

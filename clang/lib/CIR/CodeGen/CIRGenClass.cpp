@@ -929,13 +929,16 @@ void CIRGenFunction::emitForwardingCallToLambda(
   ReturnValueSlot returnSlot;
   // This should also be tracking volatile, unused, and externally destructed.
   assert(!cir::MissingFeatures::returnValueSlotFeatures());
-  // For aggregate returns, write the callee's result directly into the
-  // static invoker's return slot.  Otherwise emitReturnOfRValue below would
-  // aggregate-copy a temporary into returnValue, which is incorrect for
-  // types without a trivial copy/move (e.g. std::string) -- and trips an
-  // assertion in emitAggregateCopy.
-  if (!resultType->isVoidType() && hasAggregateEvaluationKind(resultType))
-    returnSlot = ReturnValueSlot(returnValue);
+  // For aggregate returns, route the callee's result directly to the caller.
+  // When __retval exists (trivially-copyable type), bind the return slot so
+  // the callee writes into it.  Otherwise use forNoAggregateStore() to return
+  // the SSA value directly, avoiding an illegal bitwise copy through agg.tmp.
+  if (!resultType->isVoidType() && hasAggregateEvaluationKind(resultType)) {
+    if (returnValue.isValid())
+      returnSlot = ReturnValueSlot(returnValue);
+    else
+      returnSlot = ReturnValueSlot::forNoAggregateStore();
+  }
 
   // We don't need to separately arrange the call arguments because
   // the call can't be variadic anyway --- it's impossible to forward

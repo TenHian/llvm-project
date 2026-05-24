@@ -737,8 +737,12 @@ void CIRGenFunction::emitCallAndReturnForThunk(cir::FuncOp callee,
   ReturnValueSlot slot;
   // This should also be tracking volatile, unused, and externally destructed.
   assert(!cir::MissingFeatures::returnValueSlotFeatures());
-  if (!resultType->isVoidType() && hasAggregateEvaluationKind(resultType))
-    slot = ReturnValueSlot(returnValue);
+  if (!resultType->isVoidType() && hasAggregateEvaluationKind(resultType)) {
+    if (returnValue.isValid())
+      slot = ReturnValueSlot(returnValue);
+    else
+      slot = ReturnValueSlot::forNoAggregateStore();
+  }
 
   // Now emit our call.
   CIRGenCallee cirCallee = CIRGenCallee::forDirect(callee, curGD);
@@ -755,9 +759,9 @@ void CIRGenFunction::emitCallAndReturnForThunk(cir::FuncOp callee,
   // Route the return through emitReturnOfRValue rather than leaving the
   // function to fall off the end, where LexicalScope::emitImplicitReturn
   // would drop a `cir.trap` / `cir.unreachable` and silently discard the
-  // just-computed result.  When the return type has a deleted copy ctor,
-  // returnValue is absent and emitCall materializes a temporary for the
-  // call result; emitReturnOfRValue handles both cases.
+  // just-computed result.  When __retval is absent (non-trivially-copyable
+  // type), forNoAggregateStore() tells emitCall to return the SSA value
+  // directly; emitReturnOfRValue forwards it via cir.return.
   if (!resultType->isVoidType()) {
     if (slot.isNull() && !hasAggregateEvaluationKind(resultType))
       cgm.getCXXABI().emitReturnFromThunk(*this, rv, resultType);

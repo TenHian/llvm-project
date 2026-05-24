@@ -24,10 +24,10 @@
 // prvalue of a non-copyable type is well-formed without requiring an
 // accessible copy or move constructor.
 //
-// XFAIL reason: current emitAndUpdateRetAlloca uses hasDeletedCopyConstructor()
-// check, which only skips __retval for deleted copy ctors. Non-trivial but not
-// deleted types still get __retval, causing CIR-NOT: __retval to fail.
-// Fix: replace check with !isTriviallyCopyableType().
+// emitAndUpdateRetAlloca uses hasNonTrivialCopyConstructor() which checks
+// for both deleted and user-defined copy ctors recursively, and
+// emitForwardingCallToLambda uses forNoAggregateStore when returnValue
+// is absent.
 //===----------------------------------------------------------------------===//
 
 // --- Test 13: Forwarding return of a struct with user-defined copy ctor ---
@@ -238,9 +238,9 @@ S bar() { return make<S>(); }
 }
 // --- Test 27: Lambda invoker with non-trivial copy ctor via member ---
 // TF × P4: non-trivial via member transitivity, lambda static invoker path.
-// The invoker must not go through __retval.  XFAIL because the current
-// implementation only checks for deleted copy ctors and does not use
-// forNoAggregateStore when returnValue is absent.
+// The invoker must not go through __retval.  emitForwardingCallToLambda
+// uses forNoAggregateStore when returnValue is absent, forwarding the
+// SSA value directly.
 namespace non_trivial_by_member_lambda {
 struct B {
   B();
